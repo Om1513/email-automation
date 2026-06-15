@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------------
+# Gmail Outreach Automation — example crontab (macOS / Linux)
+# Paths are pre-filled for this machine: /home/omsinghan/email-automation
+#
+# Install with:   crontab -e      (then paste ONE of the lines below)
+# View current:   crontab -l
+# ---------------------------------------------------------------------------
+
+# Option A (recommended): check every 10 minutes and send whatever is now due.
+# Resilient — if the machine is asleep at 8:00, the drafts still go out at the
+# next check. send-due is a no-op when nothing is due.
+*/10 * * * * /home/omsinghan/email-automation/run.sh send-due --campaign-id "quant-risk-june-2026" >> /home/omsinghan/email-automation/logs/cron.log 2>&1
+
+# Option B: fire once daily at 08:00 local time.
+# 0 8 * * * /home/omsinghan/email-automation/run.sh send-due --campaign-id "quant-risk-june-2026" >> /home/omsinghan/email-automation/logs/cron.log 2>&1
+
+# Notes:
+# - run.sh resolves its own directory, so cron's bare environment is fine.
+# - Output (and any errors) are appended to logs/cron.log; app logs still go to
+#   logs/outreach.log.
+# - cron uses the machine's local timezone, matching the tool's scheduling.

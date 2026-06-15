@@ -30,18 +30,17 @@ class AuthError(Exception):
     """Raised when authentication cannot be completed."""
 
 
-def _load_credentials() -> Credentials:
+def _load_credentials(token_file: str) -> Credentials:
     """Obtain valid OAuth credentials, running the consent flow if needed."""
     creds: Credentials | None = None
+    token_name = os.path.basename(token_file)
 
-    if os.path.exists(config.TOKEN_FILE):
+    if os.path.exists(token_file):
         try:
-            creds = Credentials.from_authorized_user_file(
-                config.TOKEN_FILE, config.SCOPES
-            )
-            log.debug("Loaded existing token from token.json")
+            creds = Credentials.from_authorized_user_file(token_file, config.SCOPES)
+            log.debug("Loaded existing token from %s", token_name)
         except Exception as exc:  # corrupt/incompatible token file
-            log.warning("Could not load token.json (%s); re-authenticating.", exc)
+            log.warning("Could not load %s (%s); re-authenticating.", token_name, exc)
             creds = None
 
     if creds and creds.valid:
@@ -51,7 +50,7 @@ def _load_credentials() -> Credentials:
         try:
             log.info("Access token expired; refreshing silently.")
             creds.refresh(Request())
-            _save_token(creds)
+            _save_token(creds, token_file)
             return creds
         except Exception as exc:
             log.warning("Token refresh failed (%s); falling back to consent flow.", exc)
@@ -69,29 +68,34 @@ def _load_credentials() -> Credentials:
         config.CREDENTIALS_FILE, config.SCOPES
     )
     creds = flow.run_local_server(port=0)
-    _save_token(creds)
+    _save_token(creds, token_file)
     return creds
 
 
-def _save_token(creds: Credentials) -> None:
-    """Persist credentials to token.json (never logged)."""
-    with open(config.TOKEN_FILE, "w", encoding="utf-8") as fh:
+def _save_token(creds: Credentials, token_file: str) -> None:
+    """Persist credentials to the token file (never logged)."""
+    with open(token_file, "w", encoding="utf-8") as fh:
         fh.write(creds.to_json())
     # Tighten permissions where the OS supports it.
     try:
-        os.chmod(config.TOKEN_FILE, 0o600)
+        os.chmod(token_file, 0o600)
     except OSError:
         pass
-    log.debug("Saved OAuth token to token.json")
+    log.debug("Saved OAuth token to %s", os.path.basename(token_file))
 
 
-def get_gmail_service(expected_sender: str = config.EXPECTED_SENDER):
+def get_gmail_service(
+    expected_sender: str = config.EXPECTED_SENDER, token_file: str | None = None
+):
     """Authenticate and return a verified Gmail API service object.
 
-    Raises ``AuthError`` if the authenticated account does not match
-    ``expected_sender``.
+    ``token_file`` defaults to the token file for ``expected_sender`` so each
+    account's credentials are stored separately. Raises ``AuthError`` if the
+    authenticated account does not match ``expected_sender``.
     """
-    creds = _load_credentials()
+    if token_file is None:
+        token_file = config.token_file_for(expected_sender)
+    creds = _load_credentials(token_file)
     service = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
     try:

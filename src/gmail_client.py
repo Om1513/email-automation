@@ -64,6 +64,22 @@ class GmailClient:
         log.debug("Created draft %s (message %s)", result["draft_id"], result["message_id"])
         return result
 
+    def delete_draft(self, draft_id: str) -> None:
+        """Delete an existing draft by id. Missing drafts are ignored."""
+        if not draft_id:
+            return
+        try:
+            self._service.users().drafts().delete(userId="me", id=draft_id).execute()
+            log.debug("Deleted old draft %s", draft_id)
+        except HttpError as exc:
+            # 404 = already gone; treat as success so --force stays idempotent.
+            if getattr(exc, "status_code", None) == 404 or "404" in str(exc):
+                log.debug("Old draft %s already absent.", draft_id)
+                return
+            raise GmailClientError(
+                f"Gmail API error deleting draft {draft_id}: {exc}"
+            ) from exc
+
     def send_draft(self, draft_id: str) -> str:
         """Send an existing draft by id. Returns the sent message id."""
         if not draft_id:

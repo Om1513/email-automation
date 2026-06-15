@@ -1,5 +1,6 @@
 credentials.json
 token.json
+token_*.json
 
 state/*.json
 state/backups/*.json

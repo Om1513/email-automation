@@ -21,6 +21,34 @@ Given a CSV of contacts (`name,email,company`) and a resume PDF, the tool:
 5. Tracks campaign state in JSON, prevents duplicate emails, and is safe to
    rerun.
 
+## 1a. Runs locally, for free
+
+This tool runs entirely on your own machine and costs nothing:
+
+- **No server, no hosting.** It's a local Python CLI. Drafts are created via the
+  Gmail API and sent by a local `send-due` run (triggered by your own cron / Task
+  Scheduler).
+- **No Google Cloud billing.** The Gmail API has no usage charge. You only need a
+  free Google Cloud **project** with the Gmail API enabled — **no billing account
+  is required** for these scopes.
+- **Free Gmail sending limit:** ~**500 recipients/day** for a free `@gmail.com`
+  account (limits are recipient-based — one email to 10 people counts as 10).
+  Google Workspace accounts get ~2,000/day.
+- **Rate limits:** `messages.send` costs 100 quota units and the per-user cap is
+  6,000 units/min ≈ **60 sends/minute**. The default `--send-delay-seconds 5`
+  (~12/min) stays comfortably under this; raise it if you ever see `429` errors.
+- **Testing mode is sufficient** for sending to/from your own account — just add
+  `yuktasethi@gmail.com` as a **test user**. You do **not** need to publish or
+  verify the app.
+
+> ⚠️ **7-day token note:** while the OAuth app stays in **Testing** status, Google
+> expires the **refresh token after 7 days**, so `token.json` will need a quick
+> re-auth about once a week (just re-run any command and approve the browser
+> prompt). This is fine for the create-drafts → next-morning send-due flow. If you
+> want long-lived tokens, set the OAuth consent screen **Publishing status →
+> In production** (still free; for your own account you can click through the
+> "unverified app" screen — no formal verification needed for personal use).
+
 ## 2. Gmail API limitations (important)
 
 The Gmail API supports OAuth authentication, draft creation, draft sending,
@@ -158,32 +186,42 @@ gap between sends with `--send-delay-seconds` (default 5).
 
 ## 13. Scheduling with cron (macOS / Linux)
 
-Run `send-due` every 10 minutes; it only acts when something is actually due.
+The easiest path is the included **`run.sh`** wrapper — it resolves its own
+location (so cron's bare environment is fine), bootstraps the venv on first run,
+and forwards args to the CLI. A ready-to-paste **`crontab.example`** (with this
+machine's absolute paths pre-filled) ships in the repo.
 
-```cron
-*/10 * * * * cd /absolute/path/to/gmail_outreach && /absolute/path/to/.venv/bin/python -m src.main send-due --campaign-id "quant-risk-june-2026" >> logs/cron.log 2>&1
+```bash
+crontab -e        # then paste one line from crontab.example
 ```
 
-To fire once at 8:00 AM the next day instead:
+Recommended — check every 10 minutes and send whatever is due:
 
 ```cron
-0 8 * * * cd /absolute/path/to/gmail_outreach && /absolute/path/to/.venv/bin/python -m src.main send-due --campaign-id "quant-risk-june-2026" >> logs/cron.log 2>&1
+*/10 * * * * /home/omsinghan/email-automation/run.sh send-due --campaign-id "quant-risk-june-2026" >> /home/omsinghan/email-automation/logs/cron.log 2>&1
 ```
 
-Edit your crontab with `crontab -e`.
+Or fire once daily at 08:00:
+
+```cron
+0 8 * * * /home/omsinghan/email-automation/run.sh send-due --campaign-id "quant-risk-june-2026" >> /home/omsinghan/email-automation/logs/cron.log 2>&1
+```
+
+See `crontab.example` for both options and notes.
 
 ## 14. Scheduling with Windows Task Scheduler
 
 1. Open **Task Scheduler → Create Task**.
 2. **Triggers:** New → Daily → 8:00 AM (or "Repeat task every 10 minutes").
 3. **Actions:** New → Start a program:
-   - Program/script:
-     `C:\path\to\gmail_outreach\.venv\Scripts\python.exe`
-   - Add arguments:
-     `-m src.main send-due --campaign-id "quant-risk-june-2026"`
+   - Program/script: `C:\path\to\gmail_outreach\run.bat`
+   - Add arguments: `send-due --campaign-id "quant-risk-june-2026"`
    - Start in: `C:\path\to\gmail_outreach`
 4. Save. Provide credentials if prompted to run whether or not you are logged
    in.
+
+`run.bat` bootstraps the venv on first run and forwards args to the CLI, so you
+don't have to hardcode the Python path.
 
 ## 15. Duplicate prevention
 
@@ -220,6 +258,7 @@ automatically. To recover, copy a backup back over
 | `Authenticated Gmail account does not match` | You logged in with the wrong account. Delete `token.json` and re-auth as `yuktasethi@gmail.com`. |
 | Browser doesn't open / headless server | Run `create-drafts` once on a machine with a browser to mint `token.json`, then copy it to the server. |
 | `access_denied` during consent | Add `yuktasethi@gmail.com` as a **Test user** on the OAuth consent screen. |
+| `Error 403: org_internal` ("can only be used within its organization") | The consent screen audience is set to **Internal**. Open **APIs & Services → OAuth consent screen** (a.k.a. **Google Auth Platform → Audience**), switch **User type → External**, add `yuktasethi@gmail.com` as a **Test user**, save, and retry. If the project won't allow the switch (created under a Workspace org), create a new project under your personal Google account with an **External** consent screen and a fresh **Desktop app** client. |
 | `invalid_grant` on later runs | Token revoked/expired. Delete `token.json` and re-authenticate. |
 | `Resume must be a .pdf file` | Pass a real `.pdf` path to `--resume`. |
 | `Duplicate email addresses detected` | Remove duplicate rows from the CSV. |

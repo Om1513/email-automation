@@ -62,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
             "--linkedin-url", required=True, help="LinkedIn URL to embed in the email."
         )
         p.add_argument(
+            "--sender",
+            default=config.EXPECTED_SENDER,
+            help="Gmail/Workspace account to send from (must authenticate as this "
+            f"account). Default: {config.EXPECTED_SENDER}.",
+        )
+        p.add_argument(
             "--schedule-at",
             default=None,
             help='Override send time, local tz, e.g. "2026-06-15 08:00". '
@@ -90,6 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
     # send-due
     p_send = sub.add_parser("send-due", help="Send drafts whose time has arrived.")
     p_send.add_argument("--campaign-id", required=True, help="Campaign id to send.")
+    p_send.add_argument(
+        "--sender",
+        default=config.EXPECTED_SENDER,
+        help=f"Account to send from. Default: {config.EXPECTED_SENDER}.",
+    )
     p_send.add_argument(
         "--send-delay-seconds",
         type=float,
@@ -126,6 +137,7 @@ def cmd_dry_run(args) -> int:
 
     send_time = resolve_send_time(args.schedule_at)
     log.info("DRY RUN — campaign %s", args.campaign_id)
+    log.info("Sender (From): %s", args.sender)
     log.info("Resume: %s", resume_path)
     log.info("Scheduled send time (local): %s", send_time.isoformat())
     log.info("Recipients to preview: %d", len(contacts))
@@ -171,13 +183,13 @@ def cmd_create_drafts(args) -> int:
 
     send_time = resolve_send_time(args.schedule_at)
 
-    service = get_gmail_service()
-    client = GmailClient(service, config.EXPECTED_SENDER)
+    service = get_gmail_service(args.sender)
+    client = GmailClient(service, args.sender)
 
     state = CampaignState.load_or_create(args.campaign_id)
     state.backup()  # one backup before this run mutates anything
 
-    log.info("CREATE DRAFTS — campaign %s", args.campaign_id)
+    log.info("CREATE DRAFTS — campaign %s (from %s)", args.campaign_id, args.sender)
     log.info("Scheduled send time (local): %s", send_time.isoformat())
     log.info("Recipients: %d (force=%s)", len(contacts), args.force)
 
@@ -195,6 +207,12 @@ def cmd_create_drafts(args) -> int:
 
         content = build_personalized_content(contact, linkedin_url)
         try:
+            # On --force, delete the previous draft so we replace it rather than
+            # leaving an orphaned copy in Gmail.
+            existing = state.get(email)
+            if args.force and existing and existing.get("gmail_draft_id"):
+                client.delete_draft(existing["gmail_draft_id"])
+
             result = client.create_draft(
                 to=email,
                 subject=content["subject"],
@@ -245,8 +263,8 @@ def cmd_send_due(args) -> int:
     validate_campaign_id(args.campaign_id)
     state = CampaignState.load(args.campaign_id)
 
-    service = get_gmail_service()
-    client = GmailClient(service, config.EXPECTED_SENDER)
+    service = get_gmail_service(args.sender)
+    client = GmailClient(service, args.sender)
 
     state.backup()
     now = now_local()

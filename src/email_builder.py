@@ -13,11 +13,16 @@ This module performs no network I/O, which keeps it trivially unit-testable.
 from __future__ import annotations
 
 import base64
+import html
 import os
+import re
 from email.message import EmailMessage
 from typing import Dict
 
 from . import config
+
+# Matches bare http(s) URLs so we can make them clickable in the HTML part.
+_URL_RE = re.compile(r"(https?://[^\s<]+)")
 
 
 def extract_first_name(full_name: str) -> str:
@@ -55,6 +60,29 @@ def build_personalized_content(
     return {"first_name": first_name, "subject": subject, "body": body}
 
 
+def body_to_html(body: str) -> str:
+    """Render the plain-text body as simple, well-formed HTML.
+
+    Blank-line-separated blocks become ``<p>`` paragraphs (so the email client
+    wraps them responsively instead of showing hard mid-sentence breaks), single
+    newlines within a block become ``<br>`` (keeps the signature lines together),
+    and bare URLs are made clickable.
+    """
+    blocks = body.strip().split("\n\n")
+    html_blocks = []
+    for block in blocks:
+        lines = [html.escape(line) for line in block.split("\n")]
+        joined = "<br>".join(lines)
+        joined = _URL_RE.sub(r'<a href="\1">\1</a>', joined)
+        html_blocks.append(f"<p>{joined}</p>")
+    inner = "\n".join(html_blocks)
+    return (
+        '<!DOCTYPE html><html><body style="font-family:Arial,Helvetica,sans-serif;'
+        'font-size:14px;line-height:1.5;color:#222222;">'
+        f"{inner}</body></html>"
+    )
+
+
 def build_mime_message(
     *,
     sender: str,
@@ -63,12 +91,15 @@ def build_mime_message(
     body: str,
     resume_path: str,
 ) -> EmailMessage:
-    """Build a MIME message with the resume PDF attached."""
+    """Build a multipart MIME message (plain text + HTML) with the resume PDF
+    attached. Sending both alternatives means text-only clients still work while
+    HTML clients render clean, flowing paragraphs."""
     msg = EmailMessage()
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(body)  # text/plain alternative
+    msg.add_alternative(body_to_html(body), subtype="html")  # text/html alternative
 
     with open(resume_path, "rb") as fh:
         data = fh.read()

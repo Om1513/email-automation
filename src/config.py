@@ -44,6 +44,21 @@ EXPECTED_SENDER = "yuktasethi@gmail.com"
 # It does NOT grant read access to the mailbox, keeping the footprint minimal.
 SCOPES = ["https://www.googleapis.com/auth/gmail.compose"]
 
+
+def token_file_for(sender: str) -> str:
+    """Return the token file path for a given sender account.
+
+    The default sender keeps the original ``token.json`` (back-compat); any
+    other account gets its own ``token_<account>.json`` so switching senders
+    never clobbers another account's credentials.
+    """
+    import re
+
+    if sender.lower() == EXPECTED_SENDER.lower():
+        return TOKEN_FILE
+    safe = re.sub(r"[^A-Za-z0-9]+", "_", sender.lower()).strip("_")
+    return os.path.join(PROJECT_ROOT, f"token_{safe}.json")
+
 # ---------------------------------------------------------------------------
 # Scheduling defaults
 # ---------------------------------------------------------------------------
