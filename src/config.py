@@ -9,6 +9,7 @@ account, scheduling defaults, and the email template itself.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Paths (resolved relative to the project root, i.e. the parent of src/)
@@ -21,22 +22,21 @@ TOKEN_FILE = os.path.join(PROJECT_ROOT, "token.json")
 STATE_DIR = os.path.join(PROJECT_ROOT, "state")
 BACKUP_DIR = os.path.join(STATE_DIR, "backups")
 
-# Default resume attached to every email when --resume is not supplied.
-# Falls back to the copy in files/ if the root copy is absent.
-_ROOT_RESUME = os.path.join(PROJECT_ROOT, "YUKTA_SETHI_RESUME.pdf")
-_FILES_RESUME = os.path.join(PROJECT_ROOT, "files", "Yukta_Sethi_Resume.pdf")
-DEFAULT_RESUME = _ROOT_RESUME if os.path.exists(_ROOT_RESUME) else _FILES_RESUME
-
 LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "outreach.log")
+
+
+def _resolve_resume(root_name: str, files_name: str) -> str:
+    """Return the project-root copy of a resume, falling back to files/."""
+    root_copy = os.path.join(PROJECT_ROOT, root_name)
+    if os.path.exists(root_copy):
+        return root_copy
+    return os.path.join(PROJECT_ROOT, "files", files_name)
+
 
 # ---------------------------------------------------------------------------
 # Authentication
 # ---------------------------------------------------------------------------
-# The account that MUST be authenticated. If OAuth returns any other address
-# the run is aborted. This is a guard against sending from the wrong account.
-EXPECTED_SENDER = "yuktasethi@gmail.com"
-
 # gmail.compose is sufficient for everything we do:
 #   - users.drafts.create   (create drafts)
 #   - users.drafts.send     (send drafts)
@@ -95,15 +95,15 @@ DUPLICATE_BLOCKING_STATUSES = (STATUS_DRAFT_CREATED, STATUS_SENT)
 # ---------------------------------------------------------------------------
 # Email content
 # ---------------------------------------------------------------------------
-SUBJECT = "Quant, Risk, and a real love of the numbers!"
-
 # Placeholders are replaced with str.replace (not str.format) so that any
 # stray braces in real-world data cannot break templating.
 PLACEHOLDER_FIRST_NAME = "{First Name}"
 PLACEHOLDER_COMPANY = "{Company Name}"
 PLACEHOLDER_LINKEDIN = "{LinkedIn URL}"
 
-BODY_TEMPLATE = """Hi {First Name},
+_YUKTA_SUBJECT = "Quant, Risk, and a real love of the numbers!"
+
+_YUKTA_BODY = """Hi {First Name},
 
 I've always loved numbers, the way they carry a kind of honesty, where everything has to reconcile in the end. That love grew into a fascination with how systems behave under pressure, how small changes ripple through a structure and reveal the true shape of risk. It's what pulled me toward quantitative modeling, and it's the same instinct that shapes how I approach markets and engineering today.
 
@@ -122,3 +122,137 @@ Yukta Sethi
 yuktasethi@gmail.com
 {LinkedIn URL}
 """
+
+_OM_SUBJECT = "Building is what I do best — would love to contribute at {Company Name}"
+
+# Om sends from more than one account. The body copy is identical across them;
+# only the signature address changes, so it is templated here rather than
+# duplicated -- edit the copy once and both variants stay in sync.
+_OM_SIGNATURE_EMAIL_TOKEN = "__SENDER_EMAIL__"
+
+_OM_BODY_TEMPLATE = """Hi {First Name},
+
+I've spent time learning about what you're building at {Company Name}, and I'm genuinely impressed by it. Building is the one thing I am good at. If building is what you're looking for, I would love to chat.
+
+I'm Om, a passionate coder with 2+ yrs of software development experience and a hunger to learn, eager to grow under your guidance, and help build systems from 0 -> 100 or 1 -> 100.
+
+Over the last two years, I've helped MAK Capital generate consistent five-figure weekly profits using AI-based prediction models and LLM-powered analytics pipelines. I contributed to a National Science Foundation project by developing and deploying a real-time AI simulation of a power grid. Last summer, I joined Aroris Health as a Founding Engineer, building backend and frontend features and helping scale and onboard clients onto their web platform. I'm currently working with SewerAI, helping the startup scale its infrastructure and accelerate growth as a Software Development Engineer.
+
+I've built full-stack systems with React/TypeScript front ends, Python/Node.js/Go backends (GraphQL + gRPC), and deployed on AWS/GCP and Docker, designed and trained AI/ML models, developed agentic workflows, worked with GANs, and built RAG systems using vector databases and optimized search pipelines.
+
+If there's room to talk, I'd love to hear how you think about growing the team. Even a quick call would mean a lot.
+
+Best,
+
+Om Singhan
+(917) 328-0100
+__SENDER_EMAIL__
+{LinkedIn URL}
+"""
+
+
+def _om_body_for(sender_email: str) -> str:
+    """Render Om's body with the signature address matching the sending account."""
+    return _OM_BODY_TEMPLATE.replace(_OM_SIGNATURE_EMAIL_TOKEN, sender_email)
+
+
+_OM_GMAIL_SENDER = "omsinghan25@gmail.com"
+_OM_NYU_SENDER = "oss9762@nyu.edu"
+
+
+# ---------------------------------------------------------------------------
+# Sender profiles
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class Profile:
+    """One outreach identity: who sends, which resume, and which template.
+
+    Keeping these bundled means a run can never mix (say) Om's body copy with
+    Yukta's resume attachment — picking a profile picks all three together.
+    """
+
+    key: str
+    display_name: str
+    sender: str
+    resume: str
+    subject: str
+    body_template: str
+    # Where this profile's contact CSVs live. A bare --contacts filename is
+    # resolved against this directory, so each identity's lists stay separate.
+    contacts_dir: str
+
+
+PROFILES = {
+    "yukta": Profile(
+        key="yukta",
+        display_name="Yukta Sethi",
+        sender="yuktasethi@gmail.com",
+        resume=_resolve_resume("YUKTA_SETHI_RESUME.pdf", "Yukta_Sethi_Resume.pdf"),
+        subject=_YUKTA_SUBJECT,
+        body_template=_YUKTA_BODY,
+        # Yukta's lists predate the contacts/ layout and stay in the root.
+        contacts_dir=PROJECT_ROOT,
+    ),
+    # Yukta's second sending channel. Unlike om/om-nyu, the signature keeps her
+    # gmail address: that is the contact address on her resume and the one her
+    # earlier gmail/nyu split campaigns have always used.
+    "yukta-nyu": Profile(
+        key="yukta-nyu",
+        display_name="Yukta Sethi (NYU)",
+        sender="yns2318@nyu.edu",
+        resume=_resolve_resume("YUKTA_SETHI_RESUME.pdf", "Yukta_Sethi_Resume.pdf"),
+        subject=_YUKTA_SUBJECT,
+        body_template=_YUKTA_BODY,
+        contacts_dir=PROJECT_ROOT,
+    ),
+    "om": Profile(
+        key="om",
+        display_name="Om Singhan",
+        sender=_OM_GMAIL_SENDER,
+        resume=_resolve_resume(
+            "OM_SANJAY_SINGHAN_RESUME.pdf", "Om_Sanjay_Singhan_Resume.pdf"
+        ),
+        subject=_OM_SUBJECT,
+        body_template=_om_body_for(_OM_GMAIL_SENDER),
+        contacts_dir=os.path.join(PROJECT_ROOT, "contacts", "om"),
+    ),
+    # Same person, same copy, same resume -- only the sending account and the
+    # signature address differ. Drafts live in whichever mailbox created them,
+    # so a split send needs one campaign per profile.
+    "om-nyu": Profile(
+        key="om-nyu",
+        display_name="Om Singhan (NYU)",
+        sender=_OM_NYU_SENDER,
+        resume=_resolve_resume(
+            "OM_SANJAY_SINGHAN_RESUME.pdf", "Om_Sanjay_Singhan_Resume.pdf"
+        ),
+        subject=_OM_SUBJECT,
+        body_template=_om_body_for(_OM_NYU_SENDER),
+        contacts_dir=os.path.join(PROJECT_ROOT, "contacts", "om"),
+    ),
+}
+
+# Existing campaigns and cron entries were written before profiles existed, so
+# the default stays on the original identity. Pass --profile to switch.
+DEFAULT_PROFILE = "yukta"
+
+
+def get_profile(key: str) -> Profile:
+    """Look up a profile by key, raising a helpful error on a typo."""
+    try:
+        return PROFILES[key]
+    except KeyError:
+        known = ", ".join(sorted(PROFILES))
+        raise KeyError(f"Unknown profile {key!r}. Available profiles: {known}.") from None
+
+
+# Back-compat aliases for the default profile. Existing code and docs refer to
+# these names directly; new code should read them off a Profile instead.
+_DEFAULT = PROFILES[DEFAULT_PROFILE]
+
+# The account that MUST be authenticated. If OAuth returns any other address
+# the run is aborted. This is a guard against sending from the wrong account.
+EXPECTED_SENDER = _DEFAULT.sender
+DEFAULT_RESUME = _DEFAULT.resume
+SUBJECT = _DEFAULT.subject
+BODY_TEMPLATE = _DEFAULT.body_template

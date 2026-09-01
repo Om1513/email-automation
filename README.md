@@ -136,6 +136,41 @@ pass it with `--resume`. It must exist, be readable, and end in `.pdf`.
 --resume "./files/Yukta_Sethi_Resume.pdf"
 ```
 
+If you omit `--resume`, the resume for the selected `--profile` is used.
+
+## 8b. Sender profiles (`--profile`)
+
+A **profile** bundles one outreach identity: its email template, its default
+sender account, and its default resume. Picking a profile picks all three
+together, so a run can never pair one person's body copy with another's resume.
+
+| Profile | Name | Default sender | Default resume | Contacts folder |
+| --- | --- | --- | --- | --- |
+| `yukta` *(default)* | Yukta Sethi | `yuktasethi@gmail.com` | `YUKTA_SETHI_RESUME.pdf` | project root |
+| `om` | Om Singhan | `omsinghan25@gmail.com` | `OM_SANJAY_SINGHAN_RESUME.pdf` | `contacts/om/` |
+
+```bash
+python -m src.main dry-run \
+  --profile om \
+  --contacts acme_contacts.csv \
+  --campaign-id "om-acme-2026" \
+  --linkedin-url "https://www.linkedin.com/in/omsinghan/"
+```
+
+A bare `--contacts` filename is looked up in the profile's own contacts folder,
+so `--contacts north_contacts.csv` under `--profile om` reads
+`contacts/om/north_contacts.csv`. An explicit path (relative or absolute) that
+already exists is used as-is, so nothing that worked before changes. **New
+company lists for a profile go in that profile's folder.**
+
+`--sender` and `--resume` still win when passed explicitly. Each non-default
+sender gets its own `token_<account>.json`, so authenticating as one account
+never clobbers another's credentials. Pass the same `--profile` to `send-due`
+so it authenticates as the account that owns the drafts.
+
+Templates live in `src/config.py`; add a new person by adding a `Profile` entry
+to `PROFILES`.
+
 ---
 
 ## 9. Dry run (preview only — no drafts, no sends)

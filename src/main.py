@@ -12,6 +12,7 @@ Run ``python -m src.main <command> --help`` for per-command options.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from typing import List
@@ -49,13 +50,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    def add_profile_arg(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--profile",
+            choices=sorted(config.PROFILES),
+            default=config.DEFAULT_PROFILE,
+            help="Sender identity: selects the email template, default sender "
+            f"account, and default resume (default: {config.DEFAULT_PROFILE}).",
+        )
+
     def add_common_build_args(p: argparse.ArgumentParser) -> None:
         p.add_argument("--contacts", required=True, help="Path to contacts CSV.")
+        add_profile_arg(p)
         p.add_argument(
             "--resume",
-            default=config.DEFAULT_RESUME,
+            default=None,
             help="Path to resume PDF attached to every email "
-            f"(default: {config.DEFAULT_RESUME}).",
+            "(default: the --profile resume).",
         )
         p.add_argument("--campaign-id", required=True, help="Unique campaign id.")
         p.add_argument(
@@ -63,9 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
         )
         p.add_argument(
             "--sender",
-            default=config.EXPECTED_SENDER,
+            default=None,
             help="Gmail/Workspace account to send from (must authenticate as this "
-            f"account). Default: {config.EXPECTED_SENDER}.",
+            "account). Default: the --profile sender.",
         )
         p.add_argument(
             "--schedule-at",
@@ -96,10 +107,11 @@ def build_parser() -> argparse.ArgumentParser:
     # send-due
     p_send = sub.add_parser("send-due", help="Send drafts whose time has arrived.")
     p_send.add_argument("--campaign-id", required=True, help="Campaign id to send.")
+    add_profile_arg(p_send)
     p_send.add_argument(
         "--sender",
-        default=config.EXPECTED_SENDER,
-        help=f"Account to send from. Default: {config.EXPECTED_SENDER}.",
+        default=None,
+        help="Account to send from. Default: the --profile sender.",
     )
     p_send.add_argument(
         "--send-delay-seconds",
@@ -123,12 +135,50 @@ def _apply_limit(items: List, limit) -> List:
     return items
 
 
+def _resolve_profile(args) -> config.Profile:
+    """Return the selected profile, filling in any defaults it supplies.
+
+    ``--sender`` and ``--resume`` default to ``None`` at the argparse layer so
+    an explicit flag can be told apart from an unset one; whichever is unset
+    falls back to the profile's value.
+    """
+    profile = config.get_profile(args.profile)
+    if args.sender is None:
+        args.sender = profile.sender
+    # send-due has no --resume/--contacts; it sends drafts already built.
+    if getattr(args, "resume", None) is None and hasattr(args, "resume"):
+        args.resume = profile.resume
+    if getattr(args, "contacts", None):
+        args.contacts = _resolve_contacts_path(args.contacts, profile)
+    return profile
+
+
+def _resolve_contacts_path(contacts: str, profile: config.Profile) -> str:
+    """Resolve ``--contacts`` against the profile's contacts directory.
+
+    An existing path (absolute or relative to the cwd) is used as given, so
+    nothing that worked before changes. Otherwise a bare filename is looked up
+    in the profile's own folder, which keeps each identity's lists separate
+    without making every command spell out the directory.
+    """
+    if os.path.exists(contacts):
+        return contacts
+    candidate = os.path.join(profile.contacts_dir, contacts)
+    if os.path.exists(candidate):
+        log.info("Resolved contacts to %s (profile %s).", candidate, profile.key)
+        return candidate
+    # Neither exists: return the original so validators report the path the
+    # user actually typed rather than a rewritten one.
+    return contacts
+
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 def cmd_dry_run(args) -> int:
     """Validate inputs and preview every personalized email. No side effects
     on Gmail; records are persisted with status 'previewed' for reference."""
+    profile = _resolve_profile(args)
     resume_path = validate_resume(args.resume)
     linkedin_url = validate_linkedin_url(args.linkedin_url)
     validate_campaign_id(args.campaign_id)
@@ -137,6 +187,7 @@ def cmd_dry_run(args) -> int:
 
     send_time = resolve_send_time(args.schedule_at)
     log.info("DRY RUN — campaign %s", args.campaign_id)
+    log.info("Profile: %s (%s)", profile.key, profile.display_name)
     log.info("Sender (From): %s", args.sender)
     log.info("Resume: %s", resume_path)
     log.info("Scheduled send time (local): %s", send_time.isoformat())
@@ -145,7 +196,7 @@ def cmd_dry_run(args) -> int:
     state = CampaignState.load_or_create(args.campaign_id)
 
     for i, contact in enumerate(contacts, start=1):
-        content = build_personalized_content(contact, linkedin_url)
+        content = build_personalized_content(contact, linkedin_url, profile)
         log.info("-" * 72)
         log.info("[%d/%d] To: %s <%s>", i, len(contacts), contact["name"], contact["email"])
         log.info("Company: %s | First name: %s", contact["company"], content["first_name"])
@@ -175,6 +226,7 @@ def cmd_dry_run(args) -> int:
 
 def cmd_create_drafts(args) -> int:
     """Create Gmail drafts for each contact and record scheduling metadata."""
+    profile = _resolve_profile(args)
     resume_path = validate_resume(args.resume)
     linkedin_url = validate_linkedin_url(args.linkedin_url)
     validate_campaign_id(args.campaign_id)
@@ -190,6 +242,7 @@ def cmd_create_drafts(args) -> int:
     state.backup()  # one backup before this run mutates anything
 
     log.info("CREATE DRAFTS — campaign %s (from %s)", args.campaign_id, args.sender)
+    log.info("Profile: %s (%s) | Resume: %s", profile.key, profile.display_name, resume_path)
     log.info("Scheduled send time (local): %s", send_time.isoformat())
     log.info("Recipients: %d (force=%s)", len(contacts), args.force)
 
@@ -205,7 +258,7 @@ def cmd_create_drafts(args) -> int:
             skipped += 1
             continue
 
-        content = build_personalized_content(contact, linkedin_url)
+        content = build_personalized_content(contact, linkedin_url, profile)
         try:
             # On --force, delete the previous draft so we replace it rather than
             # leaving an orphaned copy in Gmail.
@@ -260,6 +313,7 @@ def cmd_create_drafts(args) -> int:
 
 def cmd_send_due(args) -> int:
     """Send all drafts whose scheduled_send_time has arrived."""
+    _resolve_profile(args)
     validate_campaign_id(args.campaign_id)
     state = CampaignState.load(args.campaign_id)
 

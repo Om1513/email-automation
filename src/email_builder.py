@@ -49,13 +49,20 @@ def personalize(text: str, first_name: str, company: str, linkedin_url: str) -> 
 
 
 def build_personalized_content(
-    contact: Dict[str, str], linkedin_url: str
+    contact: Dict[str, str],
+    linkedin_url: str,
+    profile: "config.Profile | None" = None,
 ) -> Dict[str, str]:
-    """Return ``{first_name, subject, body}`` for a single contact."""
+    """Return ``{first_name, subject, body}`` for a single contact.
+
+    ``profile`` selects whose subject/body template to use; it defaults to the
+    profile named by ``config.DEFAULT_PROFILE``.
+    """
+    profile = profile or config.get_profile(config.DEFAULT_PROFILE)
     first_name = extract_first_name(contact["name"])
-    subject = personalize(config.SUBJECT, first_name, contact["company"], linkedin_url)
+    subject = personalize(profile.subject, first_name, contact["company"], linkedin_url)
     body = personalize(
-        config.BODY_TEMPLATE, first_name, contact["company"], linkedin_url
+        profile.body_template, first_name, contact["company"], linkedin_url
     )
     return {"first_name": first_name, "subject": subject, "body": body}
 
