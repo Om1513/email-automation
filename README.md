@@ -146,8 +146,10 @@ together, so a run can never pair one person's body copy with another's resume.
 
 | Profile | Name | Default sender | Default resume | Contacts folder |
 | --- | --- | --- | --- | --- |
-| `yukta` *(default)* | Yukta Sethi | `yuktasethi@gmail.com` | `YUKTA_SETHI_RESUME.pdf` | project root |
+| `yukta` *(default)* | Yukta Sethi | `yuktasethi@gmail.com` | `YUKTA_SETHI_RESUME.pdf` | `contacts/yukta/` |
+| `yukta-nyu` | Yukta Sethi (NYU) | `yns2318@nyu.edu` | `YUKTA_SETHI_RESUME.pdf` | `contacts/yukta/` |
 | `om` | Om Singhan | `omsinghan25@gmail.com` | `OM_SANJAY_SINGHAN_RESUME.pdf` | `contacts/om/` |
+| `om-nyu` | Om Singhan (NYU) | `oss9762@nyu.edu` | `OM_SANJAY_SINGHAN_RESUME.pdf` | `contacts/om/` |
 
 ```bash
 python -m src.main dry-run \
@@ -159,7 +161,8 @@ python -m src.main dry-run \
 
 A bare `--contacts` filename is looked up in the profile's own contacts folder,
 so `--contacts north_contacts.csv` under `--profile om` reads
-`contacts/om/north_contacts.csv`. An explicit path (relative or absolute) that
+`contacts/om/north_contacts.csv`, and the same filename under `--profile yukta`
+reads `contacts/yukta/north_contacts.csv`. An explicit path (relative or absolute) that
 already exists is used as-is, so nothing that worked before changes. **New
 company lists for a profile go in that profile's folder.**
 

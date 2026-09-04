@@ -190,8 +190,7 @@ PROFILES = {
         resume=_resolve_resume("YUKTA_SETHI_RESUME.pdf", "Yukta_Sethi_Resume.pdf"),
         subject=_YUKTA_SUBJECT,
         body_template=_YUKTA_BODY,
-        # Yukta's lists predate the contacts/ layout and stay in the root.
-        contacts_dir=PROJECT_ROOT,
+        contacts_dir=os.path.join(PROJECT_ROOT, "contacts", "yukta"),
     ),
     # Yukta's second sending channel. Unlike om/om-nyu, the signature keeps her
     # gmail address: that is the contact address on her resume and the one her
@@ -203,7 +202,7 @@ PROFILES = {
         resume=_resolve_resume("YUKTA_SETHI_RESUME.pdf", "Yukta_Sethi_Resume.pdf"),
         subject=_YUKTA_SUBJECT,
         body_template=_YUKTA_BODY,
-        contacts_dir=PROJECT_ROOT,
+        contacts_dir=os.path.join(PROJECT_ROOT, "contacts", "yukta"),
     ),
     "om": Profile(
         key="om",
