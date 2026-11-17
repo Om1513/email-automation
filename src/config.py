@@ -101,19 +101,19 @@ PLACEHOLDER_FIRST_NAME = "{First Name}"
 PLACEHOLDER_COMPANY = "{Company Name}"
 PLACEHOLDER_LINKEDIN = "{LinkedIn URL}"
 
-_YUKTA_SUBJECT = "Quant, Risk, and a real love of the numbers!"
+_YUKTA_SUBJECT = "Quant, Risk, and a real love of the numbers"
 
 _YUKTA_BODY = """Hi {First Name},
 
-I've always loved numbers, the way they carry a kind of honesty, where everything has to reconcile in the end. That love grew into a fascination with how systems behave under pressure, how small changes ripple through a structure and reveal the true shape of risk. It's what pulled me toward quantitative modeling, and it's the same instinct that shapes how I approach markets and engineering today.
+I’ve always loved numbers, the way they carry a kind of honesty, where everything has to reconcile in the end. That love grew into a fascination with how systems behave under pressure, how small changes ripple through a structure and reveal the true shape of risk. It’s what pulled me toward quantitative modeling, and it’s the instinct that shapes how I approach markets and engineering today.
 
-Most recently, I was a market risk analyst at StoneX, where I worked across global futures, rates, and fixed-income portfolios. My work centered on building quantitative risk infrastructure: Python-based exposure and SA-CCR/PFE analytics, sensitivity and curve-risk models on the MSCI RiskMetrics platform, and SQL pipelines feeding real-time risk and P&L attribution. Much of what I built was used directly by trading desks and risk leadership, which pushed me to make complex outputs intuitive, transparent, and something people could actually act on.
+Most recently, I was a market risk analyst at StoneX, working across global futures, rates, and fixed-income portfolios. I built the quantitative risk infrastructure behind the desk: Python-based exposure and SA-CCR/PFE analytics, sensitivity and curve-risk models on MSCI RiskMetrics, and SQL pipelines feeding real-time risk and P&L attribution. Much of what I built was used directly by trading desks and risk leadership, which pushed me to make complex outputs intuitive, transparent, and genuinely actionable.
 
-Before StoneX, I developed event-driven signals and sentiment factors at MAK Capital, a billion-dollar hedge fund, and modeled fixed-income sensitivities, hedging frameworks, and portfolio risk at Numeraxial using QuantLib and scenario analysis. Across all of it, I've gravitated toward work that mixes quantitative depth with real engineering and clear communication: building the tools that help a team understand how risk behaves and how to manage it.
+Before StoneX, I developed event-driven signals and sentiment factors at MAK Capital, a billion-dollar hedge fund, and modeled fixed-income sensitivities, hedging frameworks, and portfolio risk at Numeraxial using QuantLib and scenario analysis. I also build on my own time: most recently a regime-switching equity strategy end to end, HMM regime detection with momentum and mean-reversion signals, validated with proper significance testing and net of transaction costs. It’s on my GitHub (github.com/YuktaSethii). Across all of it, I gravitate toward work that blends quantitative depth with real engineering and clear communication: building the tools that help a team understand how risk behaves and where the edge is.
 
-I really like how {Company Name} pairs serious trading technology with disciplined risk management. Work like this sits exactly where I do my best thinking, at the meeting point of modeling, software, and high-visibility risk and P&L work. The chance to build and improve risk analytics platforms and to dig into model performance, backtesting, and P&L attribution is the kind of problem I'd happily lose a weekend to.
+I really admire how {Company Name} pairs serious trading technology with disciplined risk management. That intersection of modeling, software, and high-visibility risk and P&L work is exactly where I do my best thinking, and the chance to build and improve analytics, dig into model performance, backtesting, and attribution, is the kind of problem I’d happily lose a weekend to.
 
-I've attached my resume, and if my background looks like a fit for anything you're working on, I'd truly welcome the chance to connect. Even a brief conversation would mean a lot.
+My resume is attached. If my background looks like a fit for anything you’re working on, whether on the quant or risk side, I’d welcome the chance to connect.
 
 Warm regards,
 
@@ -121,6 +121,7 @@ Yukta Sethi
 (347) 728-8849
 yuktasethi@gmail.com
 {LinkedIn URL}
+https://github.com/YuktaSethii
 """
 
 _OM_SUBJECT = "Building is what I do best — would love to contribute at {Company Name}"
@@ -182,6 +183,30 @@ class Profile:
     contacts_dir: str
 
 
+# Prime Intellect runs on its own copy: the letter is written to one job
+# posting (Applied Research, quant finance) and ships a resume tailored to
+# it, so it never shares the generic template or the generic PDF.
+_YUKTA_PRIME_INTELLECT_SUBJECT = "Applied Research in quant finance, knowing when a result is real"
+
+_YUKTA_PRIME_INTELLECT_BODY = """Hi {First Name},
+
+I’ve always loved numbers for their honesty, the way everything has to reconcile in the end. That instinct pulled me into quantitative research, and specifically into the hardest part: figuring out whether a result is real or whether it falls apart under costs, a new regime, or a subtle leak in the data.
+
+Your Applied Research role in quantitative finance struck me because it describes almost exactly how I work. The “representative early problems” you list- an agent forming a hypothesis, running a point-in-time backtest, diagnosing the result, and deciding what to test next, while distinguishing durable improvement from look-ahead bias, overfitting, and hidden tail risk, are the exact questions I just spent weeks on.
+
+I recently built a regime-switching equity long/short strategy end to end: an HMM regime detector over 25 years, with momentum and mean reversion signals conditioned on the regime, validated with significance testing and net of transaction costs. The part I’m proudest of is the rigor. I caught a look-ahead bias bug, found one signal that didn’t generalize across universes, and another that had decayed, which is precisely the “did the gain come from the model or from an artifact” judgment your team centers on. It’s on my GitHub (github.com/YuktaSethii).
+
+By way of background, I’m a quantitative researcher with an MS in Financial Engineering from NYU and about two years of experience across quant risk and signal research. At MAK Capital, I built an NLP and LLM framework that turned corporate events into a predictive signal that was deployed live, and at StoneX I built Python and SQL risk analytics across 20-plus trading desks. I’ve also been working hands-on with agentic AI workflows.
+
+The research discipline you describe, meaningful baselines, careful failure attribution, and changing direction when the evidence changes, is genuinely how I think. I’d love the chance to connect and learn more about the team.
+
+Warm regards,
+Yukta Sethi
+(347) 728-8849
+yuktasethi@gmail.com
+{LinkedIn URL}
+"""
+
 PROFILES = {
     "yukta": Profile(
         key="yukta",
@@ -228,6 +253,20 @@ PROFILES = {
         subject=_OM_SUBJECT,
         body_template=_om_body_for(_OM_NYU_SENDER),
         contacts_dir=os.path.join(PROJECT_ROOT, "contacts", "om"),
+    ),
+    # Company-specific identity: same sender and signature as "yukta", but a
+    # letter written to one posting and a resume tailored to it.
+    "yukta-prime-intellect": Profile(
+        key="yukta-prime-intellect",
+        display_name="Yukta Sethi (Prime Intellect)",
+        sender="yuktasethi@gmail.com",
+        resume=_resolve_resume(
+            "Yukta_Sethi_Resume_Prime_Intellect_Applied_Research.pdf",
+            "Yukta_Sethi_Resume_Prime_Intellect_Applied_Research.pdf",
+        ),
+        subject=_YUKTA_PRIME_INTELLECT_SUBJECT,
+        body_template=_YUKTA_PRIME_INTELLECT_BODY,
+        contacts_dir=os.path.join(PROJECT_ROOT, "contacts", "yukta"),
     ),
 }
 
